@@ -20,7 +20,7 @@ export default function DashboardJobsPage() {
   const [editingJob, setEditingJob] = useState(null);
 
   // Freelancer State
-  const [appliedJobs, setAppliedJobs] = useState(new Set());
+  const [appliedJobs, setAppliedJobs] = useState(new Map());
   
   // Modal State
   const [modalConfig, setModalConfig] = useState({ isOpen: false });
@@ -84,10 +84,12 @@ export default function DashboardJobsPage() {
   async function fetchAppliedJobs(freelancerId) {
     const { data } = await supabase
       .from('applications')
-      .select('job_id')
+      .select('job_id, status')
       .eq('freelancer_id', freelancerId);
     if (data) {
-      setAppliedJobs(new Set(data.map(a => a.job_id)));
+      const appMap = new Map();
+      data.forEach(a => appMap.set(a.job_id, a.status));
+      setAppliedJobs(appMap);
     }
   }
 
@@ -149,13 +151,39 @@ export default function DashboardJobsPage() {
   }
 
   async function handleApply(jobId) {
-    const { error } = await supabase.from('applications').insert([
-      { job_id: jobId, freelancer_id: profile.id }
-    ]);
-    if (!error) {
-      setAppliedJobs(new Set([...appliedJobs, jobId]));
+    // Check if an application already exists
+    const { data: existingApp } = await supabase.from('applications')
+      .select('id, status')
+      .eq('job_id', jobId)
+      .eq('freelancer_id', profile.id)
+      .maybeSingle();
+
+    if (existingApp) {
+      if (existingApp.status === 'Canceled') {
+        const { error } = await supabase.from('applications')
+          .update({ status: 'Pending' })
+          .eq('id', existingApp.id);
+        if (!error) {
+          const newMap = new Map(appliedJobs);
+          newMap.set(jobId, 'Pending');
+          setAppliedJobs(newMap);
+        } else {
+          alert("Error re-applying: " + error.message);
+        }
+      } else {
+        alert("You have already applied.");
+      }
     } else {
-      alert("You have already applied or there was an error.");
+      const { error } = await supabase.from('applications').insert([
+        { job_id: jobId, freelancer_id: profile.id }
+      ]);
+      if (!error) {
+        const newMap = new Map(appliedJobs);
+        newMap.set(jobId, 'Pending');
+        setAppliedJobs(newMap);
+      } else {
+        alert("You have already applied or there was an error.");
+      }
     }
   }
 
@@ -174,9 +202,9 @@ export default function DashboardJobsPage() {
           .eq('freelancer_id', profile.id);
           
         if (!error) {
-          const newSet = new Set(appliedJobs);
-          newSet.delete(jobId);
-          setAppliedJobs(newSet);
+          const newMap = new Map(appliedJobs);
+          newMap.set(jobId, 'Canceled');
+          setAppliedJobs(newMap);
         } else {
           alert("Failed to cancel application: " + error.message);
         }
@@ -309,20 +337,40 @@ export default function DashboardJobsPage() {
                       <p style={{ marginTop: '0.5rem', fontSize: '0.95rem' }}>{job.description}</p>
                     </div>
                     
-                    {appliedJobs.has(job.id) ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <button className="btn btn-primary" style={{ background: 'rgba(37, 211, 102, 0.1)', color: 'var(--color-primary)', cursor: 'default' }}>
-                          ✓ Applied
-                        </button>
-                        <button onClick={() => handleCancelApplication(job.id)} className="btn btn-glass" style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', color: '#ff4444', borderColor: 'rgba(255, 68, 68, 0.3)' }}>
-                          Cancel Application
-                        </button>
-                      </div>
-                    ) : (
-                      <div>
-                        <button onClick={() => handleApply(job.id)} className="btn btn-primary">Apply Now</button>
-                      </div>
-                    )}
+                    {(() => {
+                      const appStatus = appliedJobs.get(job.id);
+                      if (appStatus === 'Pending' || appStatus === 'Hired') {
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <button className="btn btn-primary" style={{ background: 'rgba(37, 211, 102, 0.1)', color: 'var(--color-primary)', cursor: 'default' }}>
+                              ✓ {appStatus === 'Hired' ? 'Hired' : 'Applied'}
+                            </button>
+                            {appStatus === 'Pending' && (
+                              <button onClick={() => handleCancelApplication(job.id)} className="btn btn-glass" style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', color: '#ff4444', borderColor: 'rgba(255, 68, 68, 0.3)' }}>
+                                Cancel Application
+                              </button>
+                            )}
+                          </div>
+                        );
+                      } else if (appStatus === 'Rejected') {
+                        return (
+                          <div>
+                            <button className="btn btn-primary" style={{ background: 'rgba(255, 68, 68, 0.1)', color: '#ff4444', cursor: 'default', border: '1px solid rgba(255, 68, 68, 0.3)' }}>
+                              ❌ Rejected
+                            </button>
+                          </div>
+                        );
+                      } else {
+                        // Not applied OR Canceled
+                        return (
+                          <div>
+                            <button onClick={() => handleApply(job.id)} className="btn btn-primary">
+                              {appStatus === 'Canceled' ? 'Re-Apply Now' : 'Apply Now'}
+                            </button>
+                          </div>
+                        );
+                      }
+                    })()}
                     
                   </div>
                 ))}

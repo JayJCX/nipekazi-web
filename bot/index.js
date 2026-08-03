@@ -147,6 +147,29 @@ function listenToSupabase(sock) {
 
                 const msg = `*❌ Application Update*\n\nHi ${freelancer.full_name}, unfortunately your application for the job *${job.title}* was not accepted this time. Keep applying to other jobs! 💪`;
                 try { await sock.sendMessage(jid, { text: msg }); console.log(`[Sent] Reject Alert to ${jid}`); } catch (e) { console.error(`[Failed] to send to ${jid}`); }
+            } else if (payload.new.status === 'Pending' && payload.old?.status === 'Canceled') {
+                console.log("🔥 FREELANCER RE-APPLIED!", payload.new.id);
+                
+                const { data: appData } = await supabase.from('applications').select('freelancer_id, job_id').eq('id', payload.new.id).single();
+                if (!appData) return;
+
+                const { data: freelancer } = await supabase.from('profiles').select('full_name').eq('id', appData.freelancer_id).single();
+                const { data: job } = await supabase.from('jobs').select('employer_id, title').eq('id', appData.job_id).single();
+                
+                if (!job) return;
+
+                const { data: employer } = await supabase.from('profiles').select('phone_number, full_name').eq('id', job.employer_id).single();
+
+                if (!employer?.phone_number) return;
+
+                let num = employer.phone_number.replace(/\D/g, '');
+                if (num.startsWith('0')) num = '255' + num.substring(1);
+                else if (!num.startsWith('255')) num = '255' + num;
+                const jid = `${num}@s.whatsapp.net`;
+
+                const msg = `*📢 Application Re-activated!*\n\nHi ${employer.full_name}, ${freelancer?.full_name || 'Someone'} has just RE-APPLIED for your job: *${job.title}*.\n\n👉 _Log in to review and hire:_ https://nipekazi-web-atfa.vercel.app/dashboard/applications`;
+
+                try { await sock.sendMessage(jid, { text: msg }); console.log(`[Sent] Employer Alert to ${jid}`); } catch (e) { console.error(`[Failed] to send to ${jid}`); }
             }
         })
         .subscribe((status) => {
