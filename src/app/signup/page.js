@@ -23,9 +23,17 @@ export default function SignUpPage() {
     const password = formData.get("password");
     const companyName = formData.get("companyName") || null;
 
+    // Standardize phone number format
+    let formattedPhone = phone.replace(/[^0-9]/g, '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '255' + formattedPhone.substring(1);
+    } else if (!formattedPhone.startsWith('255')) {
+      formattedPhone = '255' + formattedPhone;
+    }
+
     // Workaround: Supabase requires Email/Password natively for password auth.
     // We map the phone number to a dummy email to allow Phone + Password auth without needing an SMS provider right now.
-    const dummyEmail = `${phone.replace(/[^0-9]/g, '')}@nipekazi.com`;
+    const dummyEmail = `${formattedPhone}@nipekazi.com`;
 
     try {
       // 1. Create the user in Supabase Auth
@@ -45,7 +53,7 @@ export default function SignUpPage() {
               id: authData.user.id,
               role: role,
               full_name: fullName,
-              phone_number: phone,
+              phone_number: formattedPhone,
               company_name: companyName,
               location: "Tanzania" // Default or can be added to form later
             }

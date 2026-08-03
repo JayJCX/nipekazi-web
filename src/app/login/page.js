@@ -20,8 +20,16 @@ export default function LoginPage() {
     const phone = formData.get("phone");
     const password = formData.get("password");
 
+    // Standardize phone number format
+    let formattedPhone = phone.replace(/[^0-9]/g, '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '255' + formattedPhone.substring(1);
+    } else if (!formattedPhone.startsWith('255')) {
+      formattedPhone = '255' + formattedPhone;
+    }
+
     // We map the phone number to the dummy email we used during signup
-    const dummyEmail = `${phone.replace(/[^0-9]/g, '')}@nipekazi.com`;
+    const dummyEmail = `${formattedPhone}@nipekazi.com`;
 
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({

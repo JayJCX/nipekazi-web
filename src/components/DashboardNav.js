@@ -27,8 +27,8 @@ export default function DashboardNav({ activePath = "/dashboard" }) {
       borderRadius: '12px', 
       marginBottom: '2rem',
       border: '1px solid var(--glass-border)',
-      overflowX: 'auto',
-      whiteSpace: 'nowrap'
+      flexWrap: 'wrap',
+      justifyContent: 'center'
     }}>
       {links.map(link => (
         <Link 
