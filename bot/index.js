@@ -50,50 +50,59 @@ async function startBot() {
 }
 
 function listenToSupabase(sock) {
-    console.log("📡 Subscribing to Supabase jobs table...");
+    console.log("📡 Subscribing to Supabase tables...");
     
+    // 1. Listen for New Jobs
     supabase
         .channel('jobs-insert-channel')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jobs' }, async (payload) => {
             console.log("🔥 NEW JOB POSTED!", payload.new.title);
             const newJob = payload.new;
             
-            // Fetch all freelancers
-            const { data: freelancers, error } = await supabase
-                .from('profiles')
-                .select('phone_number, full_name')
-                .eq('role', 'freelancer');
-                
-            if (error) {
-                console.error("Error fetching freelancers", error);
-                return;
-            }
+            const { data: freelancers, error } = await supabase.from('profiles').select('phone_number, full_name').eq('role', 'freelancer');
+            if (error) return console.error("Error fetching freelancers", error);
             
             const messageText = `*🚨 NipeKazi Job Alert!*\n\n*${newJob.title}*\n*Type:* ${newJob.job_type}\n*Location:* ${newJob.location}\n*Budget:* TZS ${newJob.budget}\n\n*Description:*\n${newJob.description}\n\n👉 _Log in to apply:_ https://nipekazi-web-atfa.vercel.app/login`;
             
             console.log(`Sending alerts to ${freelancers.length} freelancers...`);
-            
             for (const f of freelancers) {
                 if (!f.phone_number) continue;
-                
-                // Format phone number to WhatsApp JID format
-                let num = f.phone_number.replace(/\D/g, ''); // strip non-digits
-                
-                // Extremely basic formatting for MVP (Tanzanian context)
-                if (num.startsWith('0')) {
-                    num = '255' + num.substring(1);
-                } else if (!num.startsWith('255')) {
-                    num = '255' + num;
-                }
+                let num = f.phone_number.replace(/\D/g, '');
+                if (num.startsWith('0')) num = '255' + num.substring(1);
+                else if (!num.startsWith('255')) num = '255' + num;
                 
                 const jid = `${num}@s.whatsapp.net`;
-                
                 try {
                     await sock.sendMessage(jid, { text: messageText });
                     console.log(`[Sent] Alert to ${f.full_name} (${jid})`);
-                } catch (e) {
-                    console.error(`[Failed] to send to ${jid}`);
-                }
+                } catch (e) { console.error(`[Failed] to send to ${jid}`); }
+            }
+        })
+        .subscribe();
+
+    // 2. Listen for Hired Applications
+    supabase
+        .channel('applications-update-channel')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'applications' }, async (payload) => {
+            if (payload.new.status === 'Hired' && payload.old.status !== 'Hired') {
+                console.log("🎉 FREELANCER HIRED!", payload.new.id);
+                
+                const { data: freelancer } = await supabase.from('profiles').select('phone_number, full_name').eq('id', payload.new.freelancer_id).single();
+                const { data: job } = await supabase.from('jobs').select('title').eq('id', payload.new.job_id).single();
+
+                if (!freelancer?.phone_number || !job) return;
+
+                let num = freelancer.phone_number.replace(/\D/g, '');
+                if (num.startsWith('0')) num = '255' + num.substring(1);
+                else if (!num.startsWith('255')) num = '255' + num;
+                const jid = `${num}@s.whatsapp.net`;
+
+                const msg = `*🎉 CONGRATULATIONS ${freelancer.full_name}!*\n\nYou have been HIRED for the job: *${job.title}*\n\n👉 _Log in to view your contract and chat with the employer:_ https://nipekazi-web-atfa.vercel.app/dashboard/contracts`;
+
+                try {
+                    await sock.sendMessage(jid, { text: msg });
+                    console.log(`[Sent] Hired Alert to ${freelancer.full_name} (${jid})`);
+                } catch (e) { console.error(`[Failed] to send to ${jid}`); }
             }
         })
         .subscribe((status) => {

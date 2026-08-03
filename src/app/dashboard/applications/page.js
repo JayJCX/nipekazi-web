@@ -30,7 +30,7 @@ export default function ApplicationsPage() {
             // Freelancer sees jobs they applied to
             const { data: apps } = await supabase
               .from('applications')
-              .select('*, jobs!inner(*, profiles!employer_id(company_name))')
+              .select('*, jobs!inner(*, profiles!employer_id(company_name, phone_number))')
               .eq('freelancer_id', profileData.id);
             setApplications(apps || []);
           }
@@ -42,8 +42,26 @@ export default function ApplicationsPage() {
   }, []);
 
   async function handleHire(appId, jobId, freelancerId, budget) {
-    // Basic hire logic for employer
-    alert("In a full app, this would change the application status to Hired and create a Contract record.");
+    if (!confirm("Are you sure you want to hire this freelancer?")) return;
+    
+    // 1. Update Application status
+    const { error: appError } = await supabase.from('applications').update({ status: 'Hired' }).eq('id', appId);
+    
+    // 2. Update Job status
+    const { error: jobError } = await supabase.from('jobs').update({ status: 'In Progress' }).eq('id', jobId);
+    
+    // 3. Create Contract
+    const { error: contractError } = await supabase.from('contracts').insert([
+      { job_id: jobId, employer_id: profile.id, freelancer_id: freelancerId, agreed_amount: budget }
+    ]);
+
+    if (!appError && !jobError && !contractError) {
+      alert("Freelancer hired successfully! They have been notified on WhatsApp.");
+      setApplications(applications.map(app => app.id === appId ? { ...app, status: 'Hired' } : app));
+    } else {
+      alert("There was an error processing the hire.");
+      console.error(appError, jobError, contractError);
+    }
   }
 
   if (loading) return <main className="main-container"><p style={{padding: '2rem'}}>Loading...</p></main>;
@@ -75,8 +93,11 @@ export default function ApplicationsPage() {
                   <h3 style={{ fontSize: '1.2rem', marginBottom: '0.25rem' }}>{app.jobs?.title}</h3>
                   <p style={{ color: 'var(--text-muted)' }}>{app.jobs?.profiles?.company_name || 'Employer'} • Applied recently</p>
                 </div>
-                <div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
                   <span style={{ padding: '0.5rem 1rem', background: 'rgba(255, 165, 0, 0.1)', color: 'orange', borderRadius: '8px', fontWeight: 'bold' }}>{app.status}</span>
+                  {app.status === 'Hired' && (
+                    <a href={`https://wa.me/${app.jobs?.profiles?.phone_number}`} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ padding: '0.5rem', fontSize: '0.85rem', background: '#25D366' }}>Chat with Employer</a>
+                  )}
                 </div>
               </div>
             ))}
@@ -91,7 +112,12 @@ export default function ApplicationsPage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <span style={{ padding: '0.25rem 0.5rem', background: 'rgba(255, 165, 0, 0.1)', color: 'orange', borderRadius: '8px', fontWeight: 'bold', textAlign: 'center', marginBottom: '0.5rem' }}>{app.status}</span>
-                  <button onClick={() => handleHire(app.id, app.job_id, app.freelancer_id, app.jobs?.budget)} className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>Hire Freelancer</button>
+                  {app.status === 'Pending' && (
+                    <button onClick={() => handleHire(app.id, app.job_id, app.freelancer_id, app.jobs?.budget)} className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>Hire Freelancer</button>
+                  )}
+                  {app.status === 'Hired' && (
+                    <a href={`https://wa.me/${app.profiles?.phone_number}`} target="_blank" rel="noopener noreferrer" className="btn btn-glass" style={{ padding: '0.5rem 1rem', borderColor: '#25D366', color: '#25D366' }}>Chat on WhatsApp</a>
+                  )}
                 </div>
               </div>
             ))}
