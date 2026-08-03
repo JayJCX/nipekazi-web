@@ -249,6 +249,12 @@
   margin-bottom: 8rem;
 }
 
+.responsive-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 2rem;
+}
+
 .feature-card {
   text-align: left;
   flex: 1;
@@ -297,5 +303,9 @@
   
   .nav-links {
     display: none; /* simple mobile fix for now */
+  }
+
+  .responsive-grid {
+    grid-template-columns: 1fr;
   }
 }

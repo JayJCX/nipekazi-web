@@ -10,7 +10,7 @@ export default function WalletPage() {
         <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>My <span className="text-gradient">Wallet</span></h1>
         <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Manage your funds, view earnings, and withdraw via mobile money.</p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
+        <div className="responsive-grid">
           
           {/* Balance Card */}
           <div className="glass-card" style={{ background: 'linear-gradient(135deg, rgba(37,211,102,0.1) 0%, rgba(18,140,126,0.2) 100%)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -26,12 +26,12 @@ export default function WalletPage() {
           <div className="glass-card">
             <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Mobile Money Transfer (M-Pesa / Tigo Pesa)</h3>
             
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label>Amount (TZS)</label>
                 <input type="number" placeholder="e.g. 50000" style={inputStyle} />
               </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label>Phone Number</label>
                 <input type="tel" placeholder="+255..." style={inputStyle} />
               </div>
