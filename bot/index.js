@@ -84,7 +84,7 @@ function listenToSupabase(sock) {
     supabase
         .channel('applications-update-channel')
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'applications' }, async (payload) => {
-            if (payload.new.status === 'Hired' && payload.old.status !== 'Hired') {
+            if (payload.new.status === 'Hired' && payload.old?.status !== 'Hired') {
                 console.log("🎉 FREELANCER HIRED!", payload.new.id);
                 
                 const { data: freelancer } = await supabase.from('profiles').select('phone_number, full_name').eq('id', payload.new.freelancer_id).single();
@@ -103,10 +103,50 @@ function listenToSupabase(sock) {
                     await sock.sendMessage(jid, { text: msg });
                     console.log(`[Sent] Hired Alert to ${freelancer.full_name} (${jid})`);
                 } catch (e) { console.error(`[Failed] to send to ${jid}`); }
+            } else if (payload.new.status === 'Rejected' && payload.old?.status !== 'Rejected') {
+                console.log("❌ FREELANCER REJECTED!", payload.new.id);
+                const { data: freelancer } = await supabase.from('profiles').select('phone_number, full_name').eq('id', payload.new.freelancer_id).single();
+                const { data: job } = await supabase.from('jobs').select('title').eq('id', payload.new.job_id).single();
+
+                if (!freelancer?.phone_number || !job) return;
+
+                let num = freelancer.phone_number.replace(/\D/g, '');
+                if (num.startsWith('0')) num = '255' + num.substring(1);
+                else if (!num.startsWith('255')) num = '255' + num;
+                const jid = `${num}@s.whatsapp.net`;
+
+                const msg = `*❌ Application Update*\n\nHi ${freelancer.full_name}, unfortunately your application for the job *${job.title}* was not accepted this time. Keep applying to other jobs! 💪`;
+                try { await sock.sendMessage(jid, { text: msg }); console.log(`[Sent] Reject Alert to ${jid}`); } catch (e) { console.error(`[Failed] to send to ${jid}`); }
             }
         })
         .subscribe((status) => {
-            console.log("Supabase Realtime Status:", status);
+            console.log("Supabase Applications Realtime Status:", status);
+        });
+
+    // 3. Listen for Terminated Contracts
+    supabase
+        .channel('contracts-update-channel')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contracts' }, async (payload) => {
+            if (payload.new.status === 'Terminated' && payload.old?.status !== 'Terminated') {
+                console.log("💔 CONTRACT TERMINATED!", payload.new.id);
+                
+                const { data: freelancer } = await supabase.from('profiles').select('phone_number, full_name').eq('id', payload.new.freelancer_id).single();
+                const { data: job } = await supabase.from('jobs').select('title').eq('id', payload.new.job_id).single();
+
+                if (!freelancer?.phone_number || !job) return;
+
+                let num = freelancer.phone_number.replace(/\D/g, '');
+                if (num.startsWith('0')) num = '255' + num.substring(1);
+                else if (!num.startsWith('255')) num = '255' + num;
+                const jid = `${num}@s.whatsapp.net`;
+
+                const msg = `*💔 Contract Terminated*\n\nHi ${freelancer.full_name}, your contract for the job *${job.title}* has been terminated by the employer.\n\n👉 _Log in to view details:_ https://nipekazi-web-atfa.vercel.app/dashboard/contracts`;
+
+                try { await sock.sendMessage(jid, { text: msg }); console.log(`[Sent] Terminate Alert to ${jid}`); } catch (e) { console.error(`[Failed] to send to ${jid}`); }
+            }
+        })
+        .subscribe((status) => {
+            console.log("Supabase Contracts Realtime Status:", status);
         });
 }
 

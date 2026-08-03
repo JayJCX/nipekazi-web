@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import DashboardNav from "../../../components/DashboardNav";
+import Modal from "../../../components/Modal";
 import { supabase } from "../../../utils/supabase";
 import "../../landing.css";
 
@@ -20,6 +21,10 @@ export default function DashboardJobsPage() {
 
   // Freelancer State
   const [appliedJobs, setAppliedJobs] = useState(new Set());
+  
+  // Modal State
+  const [modalConfig, setModalConfig] = useState({ isOpen: false });
+  const closeModal = () => setModalConfig({ ...modalConfig, isOpen: false });
 
   useEffect(() => {
     async function loadData() {
@@ -125,14 +130,22 @@ export default function DashboardJobsPage() {
   }
 
   async function handleDeleteJob(jobId) {
-    if (confirm("Are you sure you want to delete this job?")) {
-      const { error } = await supabase.from('jobs').delete().eq('id', jobId);
-      if (!error) {
-        setJobs(jobs.filter(j => j.id !== jobId));
-      } else {
-        alert("Failed to delete job: " + error.message);
+    setModalConfig({
+      isOpen: true,
+      title: "Delete Job",
+      message: "Are you sure you want to delete this job? This action cannot be undone.",
+      isDanger: true,
+      confirmText: "Delete",
+      onConfirm: async () => {
+        closeModal();
+        const { error } = await supabase.from('jobs').delete().eq('id', jobId);
+        if (!error) {
+          setJobs(jobs.filter(j => j.id !== jobId));
+        } else {
+          alert("Failed to delete job: " + error.message);
+        }
       }
-    }
+    });
   }
 
   async function handleApply(jobId) {
@@ -147,20 +160,28 @@ export default function DashboardJobsPage() {
   }
 
   async function handleCancelApplication(jobId) {
-    if (confirm("Are you sure you want to withdraw your application?")) {
-      const { error } = await supabase.from('applications')
-        .delete()
-        .eq('job_id', jobId)
-        .eq('freelancer_id', profile.id);
-        
-      if (!error) {
-        const newSet = new Set(appliedJobs);
-        newSet.delete(jobId);
-        setAppliedJobs(newSet);
-      } else {
-        alert("Failed to cancel application: " + error.message);
+    setModalConfig({
+      isOpen: true,
+      title: "Cancel Application",
+      message: "Are you sure you want to withdraw your application? Employers will see this as Canceled.",
+      isDanger: true,
+      confirmText: "Withdraw",
+      onConfirm: async () => {
+        closeModal();
+        const { error } = await supabase.from('applications')
+          .update({ status: 'Canceled' })
+          .eq('job_id', jobId)
+          .eq('freelancer_id', profile.id);
+          
+        if (!error) {
+          const newSet = new Set(appliedJobs);
+          newSet.delete(jobId);
+          setAppliedJobs(newSet);
+        } else {
+          alert("Failed to cancel application: " + error.message);
+        }
       }
-    }
+    });
   }
 
   if (loading) return <main className="main-container"><p style={{padding: '2rem'}}>Loading...</p></main>;
@@ -170,6 +191,7 @@ export default function DashboardJobsPage() {
   return (
     <main className="main-container" style={{ paddingTop: '1rem', minHeight: '100vh' }}>
       <DashboardNav activePath="/dashboard/jobs" />
+      <Modal {...modalConfig} onCancel={closeModal} />
 
       <section className="animate-fade-in">
         
