@@ -30,6 +30,9 @@ export default function ProfilePage() {
 
     const formData = new FormData(e.target);
     const updates = {
+      full_name: formData.get("full_name"),
+      phone_number: formData.get("phone_number"),
+      company_name: formData.get("company_name"),
       location: formData.get("location"),
       bio: formData.get("bio")
     };
@@ -72,12 +75,12 @@ export default function ProfilePage() {
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label>Full Name <span style={{ color: 'var(--text-muted)' }}>(Read-only)</span></label>
-                <input type="text" defaultValue={profile.full_name} style={{...inputStyle, background: 'rgba(0,0,0,0.5)', color: '#888'}} readOnly />
+                <label>Full Name</label>
+                <input name="full_name" type="text" defaultValue={profile.full_name || ''} style={inputStyle} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label>WhatsApp Phone Number <span style={{ color: 'var(--text-muted)' }}>(Read-only)</span></label>
-                <input type="tel" defaultValue={profile.phone_number} style={{...inputStyle, background: 'rgba(0,0,0,0.5)', color: '#888'}} readOnly />
+                <label>WhatsApp Phone Number</label>
+                <input name="phone_number" type="tel" defaultValue={profile.phone_number || ''} style={inputStyle} />
               </div>
             </div>
 
@@ -88,8 +91,8 @@ export default function ProfilePage() {
               </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <label>Company Name <span style={{ color: 'var(--text-muted)' }}>(Read-only)</span></label>
-                <input type="text" defaultValue={profile.company_name || 'N/A'} style={{...inputStyle, background: 'rgba(0,0,0,0.5)', color: '#888'}} readOnly />
+                <label>Company Name</label>
+                <input name="company_name" type="text" defaultValue={profile.company_name || ''} style={inputStyle} />
               </div>
             </div>
 

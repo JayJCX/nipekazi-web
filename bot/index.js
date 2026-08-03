@@ -69,7 +69,7 @@ function listenToSupabase(sock) {
                 return;
             }
             
-            const messageText = `*🚨 NipeKazi Job Alert!*\n\n*${newJob.title}*\n*Type:* ${newJob.job_type}\n*Location:* ${newJob.location}\n*Budget:* TZS ${newJob.budget}\n\n*Description:*\n${newJob.description}\n\n👉 _Log in to apply:_ http://localhost:3000/login`;
+            const messageText = `*🚨 NipeKazi Job Alert!*\n\n*${newJob.title}*\n*Type:* ${newJob.job_type}\n*Location:* ${newJob.location}\n*Budget:* TZS ${newJob.budget}\n\n*Description:*\n${newJob.description}\n\n👉 _Log in to apply:_ https://nipekazi-web-atfa.vercel.app/login`;
             
             console.log(`Sending alerts to ${freelancers.length} freelancers...`);
             
