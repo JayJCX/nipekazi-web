@@ -52,11 +52,9 @@ export function LanguageProvider({ children }) {
     return translations[language][key];
   };
 
-  if (!mounted) return <div style={{ visibility: 'hidden' }}>{children}</div>;
-
   return (
     <LanguageContext.Provider value={{ language, changeLanguage, theme, toggleTheme, t }}>
-      {children}
+      {!mounted ? <div style={{ visibility: 'hidden' }}>{children}</div> : children}
     </LanguageContext.Provider>
   );
 }
