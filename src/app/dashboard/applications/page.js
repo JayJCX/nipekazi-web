@@ -59,7 +59,12 @@ export default function ApplicationsPage() {
       alert("Freelancer hired successfully! They have been notified on WhatsApp.");
       setApplications(applications.map(app => app.id === appId ? { ...app, status: 'Hired' } : app));
     } else {
-      alert("There was an error processing the hire.");
+      const errorDetails = [
+        appError ? `AppError: ${appError.message}` : '',
+        jobError ? `JobError: ${jobError.message}` : '',
+        contractError ? `ContractError: ${contractError.message}` : ''
+      ].filter(Boolean).join('\n');
+      alert(`There was an error processing the hire:\n${errorDetails}`);
       console.error(appError, jobError, contractError);
     }
   }
