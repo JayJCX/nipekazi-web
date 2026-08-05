@@ -13,6 +13,9 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+let globalSock = null;
+let isSupabaseListening = false;
+
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
     
@@ -21,8 +24,14 @@ async function startBot() {
         auth: state,
         printQRInTerminal: true,
         // Suppress massive log output from baileys
-        logger: require('pino')({ level: 'silent' })
+        logger: require('pino')({ level: 'silent' }),
+        // Make connection lighter and less prone to 515 stream errors
+        browser: ['NipeKazi', 'Chrome', '10.15.7'],
+        syncFullHistory: false,
+        markOnlineOnConnect: false
     });
+
+    globalSock = sock;
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
@@ -35,26 +44,44 @@ async function startBot() {
         }
 
         if (connection === 'close') {
-            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Connection closed. Reconnecting:', shouldReconnect);
+            const statusCode = lastDisconnect.error?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            console.log(`Connection closed. Status code: ${statusCode}. Reconnecting: ${shouldReconnect}`);
+            if (lastDisconnect.error) {
+                console.error("Disconnect Error:", lastDisconnect.error);
+            }
+            
+            // CRITICAL FIX: Destroy the old socket so it stops writing to the auth folder and corrupting it!
+            if (globalSock) {
+                globalSock.ev.removeAllListeners();
+            }
+
             if (shouldReconnect) {
-                startBot();
+                console.log("Waiting 3 seconds for network to stabilize before reconnecting...");
+                setTimeout(() => startBot(), 3000); 
+            } else {
+                console.log("❌ SESSION LOGGED OUT. You must delete auth_info_baileys and scan a new QR code.");
             }
         } else if (connection === 'open') {
             console.log('✅ WhatsApp connection opened successfully!');
-            listenToSupabase(sock);
+            if (!isSupabaseListening) {
+                listenToSupabase();
+            }
         }
     });
 
     sock.ev.on('creds.update', saveCreds);
 }
 
-function listenToSupabase(sock) {
+function listenToSupabase() {
     console.log("📡 Subscribing to Supabase tables...");
+    isSupabaseListening = true;
     
-    // 1. Listen for New Jobs
-    supabase
-        .channel('jobs-insert-channel')
+    // Combine all listeners into a SINGLE channel to prevent connection drops/limits
+    const channel = supabase.channel('nipekazi-global-channel');
+
+    channel
+        // 1. Listen for New Jobs (INSERT)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jobs' }, async (payload) => {
             console.log("🔥 NEW JOB POSTED!", payload.new.title);
             const newJob = payload.new;
@@ -73,16 +100,15 @@ function listenToSupabase(sock) {
                 
                 const jid = `${num}@s.whatsapp.net`;
                 try {
-                    await sock.sendMessage(jid, { text: messageText });
+                    await globalSock.onWhatsApp(jid); // Fetch encryption keys
+                    await globalSock.sendMessage(jid, { text: messageText });
                     console.log(`[Sent] Alert to ${f.full_name} (${jid})`);
-                } catch (e) { console.error(`[Failed] to send to ${jid}`); }
+                } catch (e) { 
+                    console.error(`[Failed] to send to ${jid}. Error:`, e.message || e); 
+                }
             }
         })
-        .subscribe();
-
-    // 2. Listen for New Applications (Insert)
-    supabase
-        .channel('applications-insert-channel')
+        // 2. Listen for New Applications (INSERT)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'applications' }, async (payload) => {
             console.log("🔥 NEW APPLICATION SUBMITTED!", payload.new.id);
             const { data: freelancer } = await supabase.from('profiles').select('full_name').eq('id', payload.new.freelancer_id).single();
@@ -101,13 +127,13 @@ function listenToSupabase(sock) {
 
             const msg = `*📢 New Application Received!*\n\nHi ${employer.full_name}, ${freelancer?.full_name || 'Someone'} has just applied for your job: *${job.title}*.\n\n👉 _Log in to review and hire:_ https://nipekazi-web-atfa.vercel.app/dashboard/applications`;
 
-            try { await sock.sendMessage(jid, { text: msg }); console.log(`[Sent] Employer Alert to ${jid}`); } catch (e) { console.error(`[Failed] to send to ${jid}`); }
+            try { 
+                await globalSock.onWhatsApp(jid); // Fetch encryption keys
+                await globalSock.sendMessage(jid, { text: msg }); 
+                console.log(`[Sent] Employer Alert to ${jid}`); 
+            } catch (e) { console.error(`[Failed] to send to ${jid}`); }
         })
-        .subscribe();
-
-    // 3. Listen for Hired/Rejected Applications (Update)
-    supabase
-        .channel('applications-update-channel')
+        // 3. Listen for Hired/Rejected Applications (UPDATE)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'applications' }, async (payload) => {
             if (payload.new.status === 'Hired' && payload.old?.status !== 'Hired') {
                 console.log("🎉 FREELANCER HIRED!", payload.new.id);
@@ -127,7 +153,11 @@ function listenToSupabase(sock) {
 
                 const msg = `*🎉 CONGRATULATIONS ${freelancer.full_name}!*\n\nYou have been HIRED for the job: *${job.title}*\n\n👉 _Log in to view your contract and chat with the employer:_ https://nipekazi-web-atfa.vercel.app/dashboard/contracts`;
 
-                try { await sock.sendMessage(jid, { text: msg }); console.log(`[Sent] Hired Alert to ${freelancer.full_name} (${jid})`); } catch (e) { console.error(`[Failed] to send to ${jid}`); }
+                try { 
+                    await globalSock.onWhatsApp(jid); 
+                    await globalSock.sendMessage(jid, { text: msg }); 
+                    console.log(`[Sent] Hired Alert to ${freelancer.full_name} (${jid})`); 
+                } catch (e) { console.error(`[Failed] to send to ${jid}`); }
             
             } else if (payload.new.status === 'Rejected' && payload.old?.status !== 'Rejected') {
                 console.log("❌ FREELANCER REJECTED!", payload.new.id);
@@ -146,7 +176,11 @@ function listenToSupabase(sock) {
                 const jid = `${num}@s.whatsapp.net`;
 
                 const msg = `*❌ Application Update*\n\nHi ${freelancer.full_name}, unfortunately your application for the job *${job.title}* was not accepted this time. Keep applying to other jobs! 💪`;
-                try { await sock.sendMessage(jid, { text: msg }); console.log(`[Sent] Reject Alert to ${jid}`); } catch (e) { console.error(`[Failed] to send to ${jid}`); }
+                try { 
+                    await globalSock.onWhatsApp(jid);
+                    await globalSock.sendMessage(jid, { text: msg }); 
+                    console.log(`[Sent] Reject Alert to ${jid}`); 
+                } catch (e) { console.error(`[Failed] to send to ${jid}`); }
             } else if (payload.new.status === 'Pending' && payload.old?.status === 'Canceled') {
                 console.log("🔥 FREELANCER RE-APPLIED!", payload.new.id);
                 
@@ -169,16 +203,14 @@ function listenToSupabase(sock) {
 
                 const msg = `*📢 Application Re-activated!*\n\nHi ${employer.full_name}, ${freelancer?.full_name || 'Someone'} has just RE-APPLIED for your job: *${job.title}*.\n\n👉 _Log in to review and hire:_ https://nipekazi-web-atfa.vercel.app/dashboard/applications`;
 
-                try { await sock.sendMessage(jid, { text: msg }); console.log(`[Sent] Employer Alert to ${jid}`); } catch (e) { console.error(`[Failed] to send to ${jid}`); }
+                try { 
+                    await globalSock.onWhatsApp(jid);
+                    await globalSock.sendMessage(jid, { text: msg }); 
+                    console.log(`[Sent] Employer Alert to ${jid}`); 
+                } catch (e) { console.error(`[Failed] to send to ${jid}`); }
             }
         })
-        .subscribe((status) => {
-            console.log("Supabase Applications Realtime Status:", status);
-        });
-
-    // 4. Listen for Terminated Contracts (Update)
-    supabase
-        .channel('contracts-update-channel')
+        // 4. Listen for Terminated Contracts (UPDATE)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contracts' }, async (payload) => {
             if (payload.new.status === 'Terminated' && payload.old?.status !== 'Terminated') {
                 console.log("💔 CONTRACT TERMINATED!", payload.new.id);
@@ -198,7 +230,11 @@ function listenToSupabase(sock) {
 
                 const msg = `*💔 Contract Terminated*\n\nHi ${freelancer.full_name}, your contract for the job *${job.title}* has been terminated by the employer.\n\n👉 _Log in to view details:_ https://nipekazi-web-atfa.vercel.app/dashboard/contracts`;
 
-                try { await sock.sendMessage(jid, { text: msg }); console.log(`[Sent] Terminate Alert to ${jid}`); } catch (e) { console.error(`[Failed] to send to ${jid}`); }
+                try { 
+                    await globalSock.onWhatsApp(jid);
+                    await globalSock.sendMessage(jid, { text: msg }); 
+                    console.log(`[Sent] Terminate Alert to ${jid}`); 
+                } catch (e) { console.error(`[Failed] to send to ${jid}`); }
             }
         })
         .subscribe((status) => {

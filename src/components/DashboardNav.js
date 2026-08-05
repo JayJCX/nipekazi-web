@@ -1,22 +1,46 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useLanguage } from "../context/LanguageContext";
+import { supabase } from "../utils/supabase";
 
 export default function DashboardNav({ activePath = "/dashboard" }) {
   const { t } = useLanguage();
+  const [role, setRole] = useState(null);
 
-  const links = [
-    { name: t("nav_home"), path: "/dashboard" },
-    { name: t("nav_profile"), path: "/profile" },
-    { name: t("nav_jobs"), path: "/dashboard/jobs" },
-    { name: t("nav_applications"), path: "/dashboard/applications" },
-    { name: t("nav_contracts"), path: "/dashboard/contracts" },
-    { name: t("nav_wallet"), path: "/dashboard/wallet" },
-    { name: t("nav_report"), path: "/dashboard/report" },
-    { name: t("nav_notifications"), path: "/notifications" },
-    { name: t("nav_settings"), path: "/settings" }
-  ];
+  useEffect(() => {
+    async function fetchRole() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        if (data) setRole(data.role);
+      }
+    }
+    fetchRole();
+  }, []);
+
+  let links = [];
+  if (role === 'admin') {
+    links = [
+      { name: "System Overview", path: "/dashboard" },
+      { name: "Manage Users", path: "/dashboard/admin/users" },
+      { name: "Monitor Jobs", path: "/dashboard/admin/jobs" },
+      { name: "System Settings", path: "/settings" }
+    ];
+  } else {
+    links = [
+      { name: t("nav_home") || "Home", path: "/dashboard" },
+      { name: t("nav_profile") || "Profile", path: "/profile" },
+      { name: t("nav_jobs") || "Jobs", path: "/dashboard/jobs" },
+      { name: t("nav_applications") || "Applications", path: "/dashboard/applications" },
+      { name: t("nav_contracts") || "Contracts", path: "/dashboard/contracts" },
+      { name: t("nav_wallet") || "Wallet", path: "/dashboard/wallet" },
+      { name: t("nav_report") || "Report", path: "/dashboard/report" },
+      { name: t("nav_notifications") || "Notifications", path: "/notifications" },
+      { name: t("nav_settings") || "Settings", path: "/settings" }
+    ];
+  }
 
   return (
     <nav style={{ 
