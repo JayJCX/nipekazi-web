@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import DashboardNav from "../../../../components/DashboardNav";
-import "../../../../landing.css";
+import "../../../landing.css";
 import { supabase } from "../../../../utils/supabase";
 
 export default function AdminUsersPage() {
