@@ -8,7 +8,8 @@ import { supabase } from "../../utils/supabase";
 
 export default function DashboardOverview() {
   const [role, setRole] = useState(null);
-  const [stats, setStats] = useState({ users: 0, jobs: 0, applications: 0 });
+  const [stats, setStats] = useState({ users: 0, jobs: 0, applications: 0, reports: 0 });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchRoleAndStats() {
@@ -18,17 +19,26 @@ export default function DashboardOverview() {
         if (data) {
           setRole(data.role);
           if (data.role === 'admin') {
-            // Fetch basic stats
             const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
             const { count: jobCount } = await supabase.from('jobs').select('*', { count: 'exact', head: true });
             const { count: appCount } = await supabase.from('applications').select('*', { count: 'exact', head: true });
-            setStats({ users: userCount || 0, jobs: jobCount || 0, applications: appCount || 0 });
+            const { count: repCount } = await supabase.from('reports').select('*', { count: 'exact', head: true });
+            setStats({ users: userCount || 0, jobs: jobCount || 0, applications: appCount || 0, reports: repCount || 0 });
           }
         }
       }
+      setLoading(false);
     }
     fetchRoleAndStats();
   }, []);
+
+  if (loading) {
+    return (
+      <main className="main-container" style={{ paddingTop: '1rem', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: 'var(--text-muted)' }}>Loading Dashboard...</p>
+      </main>
+    );
+  }
 
   return (
     <main className="main-container" style={{ paddingTop: '1rem', minHeight: '100vh' }}>
@@ -56,12 +66,19 @@ export default function DashboardOverview() {
               <p style={{ color: 'var(--text-muted)' }}>Monitor active and closed jobs.</p>
             </Link>
 
-            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <Link href="/dashboard/admin/applications" className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', cursor: 'pointer', textDecoration: 'none' }}>
               <div style={{ fontSize: '2.5rem' }}>📄</div>
               <h3 style={{ fontSize: '1.25rem' }}>Total Applications</h3>
               <p style={{ color: 'var(--color-primary)', fontSize: '2rem', fontWeight: 'bold' }}>{stats.applications}</p>
               <p style={{ color: 'var(--text-muted)' }}>System-wide job applications.</p>
-            </div>
+            </Link>
+
+            <Link href="/dashboard/admin/reports" className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', cursor: 'pointer', textDecoration: 'none', borderBottom: '4px solid #ff4444' }}>
+              <div style={{ fontSize: '2.5rem' }}>🚩</div>
+              <h3 style={{ fontSize: '1.25rem' }}>Total Reports</h3>
+              <p style={{ color: 'var(--color-primary)', fontSize: '2rem', fontWeight: 'bold' }}>{stats.reports}</p>
+              <p style={{ color: 'var(--text-muted)' }}>Review and manage user reports.</p>
+            </Link>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem' }}>

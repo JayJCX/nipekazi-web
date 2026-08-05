@@ -37,7 +37,6 @@ export default function DashboardNav({ activePath = "/dashboard" }) {
       { name: t("nav_contracts") || "Contracts", path: "/dashboard/contracts" },
       { name: t("nav_wallet") || "Wallet", path: "/dashboard/wallet" },
       { name: t("nav_report") || "Report", path: "/dashboard/report" },
-      { name: t("nav_notifications") || "Notifications", path: "/notifications" },
       { name: t("nav_settings") || "Settings", path: "/settings" }
     ];
   }

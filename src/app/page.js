@@ -10,9 +10,9 @@ export default function Home() {
           <span className="text-gradient fw-bold" style={{ fontSize: '1.8rem' }}>NipeKazi</span>
         </div>
         <div className="nav-links">
-          <a href="#about" className="nav-link">About Us</a>
-          <a href="#how-it-works" className="nav-link">How it Works</a>
-          <a href="#benefits" className="nav-link">Why Us</a>
+          <a href="#about" className="nav-link hide-mobile">About Us</a>
+          <a href="#how-it-works" className="nav-link hide-mobile">How it Works</a>
+          <a href="#benefits" className="nav-link hide-mobile">Why Us</a>
           <div className="nav-auth">
             <Link href="/login" className="btn btn-glass" style={{ marginRight: '1rem' }}>Log In</Link>
             <Link href="/signup" className="btn btn-primary">Sign Up</Link>

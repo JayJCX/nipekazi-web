@@ -237,6 +237,24 @@ function listenToSupabase() {
                 } catch (e) { console.error(`[Failed] to send to ${jid}`); }
             }
         })
+        // 5. Listen for Admin Warnings (INSERT)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_messages' }, async (payload) => {
+            console.log("⚠️ ADMIN WARNING TRIGGERED!", payload.new.id);
+            
+            const { data: user } = await supabase.from('profiles').select('phone_number, full_name').eq('id', payload.new.target_user_id).single();
+            if (!user?.phone_number) return;
+
+            let num = user.phone_number.replace(/\D/g, '');
+            if (num.startsWith('0')) num = '255' + num.substring(1);
+            else if (!num.startsWith('255')) num = '255' + num;
+            const jid = `${num}@s.whatsapp.net`;
+
+            try { 
+                await globalSock.onWhatsApp(jid);
+                await globalSock.sendMessage(jid, { text: payload.new.message }); 
+                console.log(`[Sent] Admin Warning to ${user.full_name} (${jid})`); 
+            } catch (e) { console.error(`[Failed] to send to ${jid}`); }
+        })
         .subscribe((status) => {
             console.log("Supabase Contracts Realtime Status:", status);
         });

@@ -302,7 +302,21 @@
   }
   
   .nav-links {
-    display: none; /* simple mobile fix for now */
+    gap: 0.5rem;
+  }
+  
+  .nav-link.hide-mobile {
+    display: none;
+  }
+
+  .nav-auth {
+    margin-left: 0.5rem;
+    padding-left: 0.5rem;
+  }
+
+  .btn-lg {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
   }
 
   .responsive-grid {
